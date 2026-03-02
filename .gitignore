@@ -1,0 +1,13 @@
+# Compiled
+target/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Environment / Secrets
+application.properties
+
+# OS
+.DS_Store
+Thumbs.db
