@@ -31,8 +31,14 @@ public class Account {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @Column(nullable = false)
+    private String ifscCode;
+
+    @Column(nullable = false)
+    private String branchAddress;
+
     //userId
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id")
     private User user;
 
