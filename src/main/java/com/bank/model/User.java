@@ -30,12 +30,23 @@ public class User {
 
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Status status;
+
+
+    public enum Status {
+        ACTIVE, INACTIVE
+    }
+
     @PrePersist
     protected void onCreate() {
+
         createdAt = LocalDateTime.now();
+        if (status == null) status = Status.ACTIVE;
     }
 
     public enum Role {
-        CUSTOMER, ADMIN
+        ADMIN, ANALYST, VIEWER
     }
 }

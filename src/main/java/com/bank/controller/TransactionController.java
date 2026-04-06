@@ -3,6 +3,7 @@ package com.bank.controller;
 import com.bank.dto.AmountRequest;
 import com.bank.dto.TransactionResponse;
 import com.bank.dto.TransferRequest;
+import com.bank.dto.UpdateTransactionRequest;
 import com.bank.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ public class TransactionController {
             @PathVariable String accountNumber,
             @Valid @RequestBody AmountRequest request) {
         return ResponseEntity.ok(
-                transactionService.deposit(accountNumber, request.getAmount()));
+                transactionService.deposit(accountNumber, request));
     }
 
     @PostMapping("/withdraw/{accountNumber}")
@@ -31,7 +32,7 @@ public class TransactionController {
             @PathVariable String accountNumber,
             @Valid @RequestBody AmountRequest request) {
         return ResponseEntity.ok(
-                transactionService.withdraw(accountNumber, request.getAmount()));
+                transactionService.withdraw(accountNumber, request));
     }
 
     @PostMapping("/transfer")
@@ -42,8 +43,26 @@ public class TransactionController {
 
     @GetMapping("/history/{accountNumber}")
     public ResponseEntity<List<TransactionResponse>> getHistory(
-            @PathVariable String accountNumber) {
+            @PathVariable String accountNumber,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
         return ResponseEntity.ok(
-                transactionService.getTransactionHistory(accountNumber));
+                transactionService.getTransactionHistory(
+                        accountNumber, type, category, startDate, endDate));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<TransactionResponse> updateTransaction(
+            @PathVariable Long id,
+            @RequestBody UpdateTransactionRequest request) {
+        return ResponseEntity.ok(transactionService.updateTransaction(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTransaction(@PathVariable Long id) {
+        transactionService.deleteTransaction(id);
+        return ResponseEntity.noContent().build();
     }
 }

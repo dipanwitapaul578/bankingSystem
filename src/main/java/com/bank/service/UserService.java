@@ -35,7 +35,8 @@ public class UserService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setRole(User.Role.CUSTOMER);
+        user.setRole(User.Role.VIEWER);
+        user.setStatus(User.Status.ACTIVE);
 
         //Step 3: Save to database
         User savedUser = userRepository.save(user);

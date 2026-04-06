@@ -13,21 +13,19 @@ public class TransferRequest {
     @NotNull(message = "Transfer mode is required")
     private TransferMode transferMode;
 
-    // Used for ACCOUNT and IFSC mode
     private String fromAccountNumber;
 
-    // Used for ACCOUNT mode
     private String toAccountNumber;
 
-    // Used for PHONE mode
     private String fromPhoneNumber;
     private String toPhoneNumber;
 
-    // Used for IFSC mode
     private String toIfscCode;
 
-    // Used for PHONE mode
     private Account.AccountType accountType;
+
+    private String category;
+
 
     @NotNull
     @DecimalMin(value = "0.01", message = "Amount must be greater than 0")

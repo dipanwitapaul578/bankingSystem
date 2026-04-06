@@ -18,12 +18,12 @@ public class Transaction {
 
 
     //from_account_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "from_account_id", nullable = true)
     private Account fromAccount;
 
     //to_account_id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "to_account_id")
     private Account toAccount;
 
@@ -34,6 +34,10 @@ public class Transaction {
     //type
     @Enumerated(EnumType.STRING)
     private Type type;
+
+    //Category
+    @Column(nullable = true)
+    private String category;
 
     //description
     @Column(nullable = true)

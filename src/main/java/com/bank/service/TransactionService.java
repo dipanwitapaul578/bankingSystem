@@ -1,7 +1,9 @@
 package com.bank.service;
 
+import com.bank.dto.AmountRequest;
 import com.bank.dto.TransactionResponse;
 import com.bank.dto.TransferRequest;
+import com.bank.dto.UpdateTransactionRequest;
 import com.bank.model.Account;
 import com.bank.model.Transaction;
 import com.bank.repository.AccountRepository;
@@ -11,9 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
 
 @Service
 @RequiredArgsConstructor
@@ -23,9 +26,9 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
 
     @Transactional
-    public TransactionResponse deposit(String accountNumber, BigDecimal amount) {
+    public TransactionResponse deposit(String accountNumber, AmountRequest request) {
 
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("Deposit amount must be greater than zero");
         }
 
@@ -36,23 +39,24 @@ public class TransactionService {
             throw new RuntimeException("Account is frozen");
         }
 
-        account.setBalance(account.getBalance().add(amount));
+        account.setBalance(account.getBalance().add(request.getAmount()));
         accountRepository.save(account);
 
         Transaction transaction = new Transaction();
         transaction.setToAccount(account);
-        transaction.setAmount(amount);
+        transaction.setAmount(request.getAmount());
         transaction.setType(Transaction.Type.DEPOSIT);
         transaction.setDescription("Deposit to " + accountNumber);
+        transaction.setCategory(request.getCategory() != null ? request.getCategory() : "DEPOSIT");
 
         Transaction saved = transactionRepository.save(transaction);
         return mapToResponse(saved);
     }
 
     @Transactional
-    public TransactionResponse withdraw(String accountNumber, BigDecimal amount) {
+    public TransactionResponse withdraw(String accountNumber, AmountRequest request) {
 
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("Withdrawal amount must be greater than zero");
         }
 
@@ -63,18 +67,19 @@ public class TransactionService {
             throw new RuntimeException("Account is frozen");
         }
 
-        if (account.getBalance().compareTo(amount) < 0) {
+        if (account.getBalance().compareTo(request.getAmount()) < 0) {
             throw new RuntimeException("Insufficient balance");
         }
 
-        account.setBalance(account.getBalance().subtract(amount));
+        account.setBalance(account.getBalance().subtract(request.getAmount()));
         accountRepository.save(account);
 
         Transaction transaction = new Transaction();
         transaction.setToAccount(account);
-        transaction.setAmount(amount);
+        transaction.setAmount(request.getAmount());
         transaction.setType(Transaction.Type.WITHDRAWAL);
         transaction.setDescription("Withdrawal from " + accountNumber);
+        transaction.setCategory(request.getCategory() != null ? request.getCategory() : "WITHDRAWAL");
 
         Transaction saved = transactionRepository.save(transaction);
         return mapToResponse(saved);
@@ -105,7 +110,8 @@ public class TransactionService {
             }
 
             case PHONE -> {
-                Account.AccountType type = request.getAccountType() != null ? request.getAccountType() : Account.AccountType.SAVINGS;
+                Account.AccountType type = request.getAccountType() != null
+                        ? request.getAccountType() : Account.AccountType.SAVINGS;
                 fromAccount = accountRepository
                         .findByUserPhoneNumberAndType(request.getFromPhoneNumber(), type)
                         .orElseThrow(() -> new RuntimeException("No active account found"));
@@ -156,24 +162,58 @@ public class TransactionService {
                 : "Transfer from " + fromAccount.getUser().getFullName()
                 + " to " + toAccount.getUser().getFullName()
                 + " via " + request.getTransferMode().name());
+        transaction.setCategory(request.getCategory() != null ? request.getCategory() : "TRANSFER");
 
         Transaction saved = transactionRepository.save(transaction);
         return mapToResponse(saved);
     }
 
-    public List<TransactionResponse> getTransactionHistory(String accountNumber) {
+    public List<TransactionResponse> getTransactionHistory(
+            String accountNumber,
+            String type,
+            String category,
+            String startDate,
+            String endDate) {
+
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new RuntimeException("Account not found"));
 
-        List<Transaction> sent = transactionRepository
-                .findByFromAccountId(account.getId());
-        List<Transaction> received = transactionRepository
-                .findByToAccountId(account.getId());
+        Transaction.Type transactionType = null;
+        if (type != null && !type.isEmpty()) {
+            transactionType = Transaction.Type.valueOf(type.toUpperCase());
+        }
 
-        return Stream.concat(sent.stream(), received.stream())
-                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+        LocalDateTime start = startDate != null && !startDate.isEmpty()
+                ? LocalDateTime.parse(startDate + "T00:00:00") : null;
+        LocalDateTime end = endDate != null && !endDate.isEmpty()
+                ? LocalDateTime.parse(endDate + "T23:59:59") : null;
+
+        return transactionRepository
+                .findFilteredTransactions(account.getId(), transactionType, category, start, end)
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    public TransactionResponse updateTransaction(Long id, UpdateTransactionRequest request) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+
+        if (request.getCategory() != null) {
+            transaction.setCategory(request.getCategory());
+        }
+        if (request.getDescription() != null) {
+            transaction.setDescription(request.getDescription());
+        }
+
+        Transaction saved = transactionRepository.save(transaction);
+        return mapToResponse(saved);
+    }
+
+    public void deleteTransaction(Long id) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+        transactionRepository.delete(transaction);
     }
 
     private TransactionResponse mapToResponse(Transaction t) {
@@ -189,13 +229,13 @@ public class TransactionService {
     }
 
     private String maskAccountNumber(String accountNumber) {
-        // Shows only last 4 digits → ******6789
         return "******" + accountNumber.substring(accountNumber.length() - 4);
     }
 
     private String buildDescription(Transaction t) {
         String toName = t.getToAccount().getUser().getFullName();
-        String fromName = t.getFromAccount() != null ? t.getFromAccount().getUser().getFullName() : "Cash";
+        String fromName = t.getFromAccount() != null
+                ? t.getFromAccount().getUser().getFullName() : "Cash";
 
         return switch (t.getType()) {
             case DEPOSIT -> "Deposit by " + fromName;
